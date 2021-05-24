@@ -18,19 +18,24 @@
             :placeholder="$t('subscribers.email')" required></b-input>
         </b-field>
 
-        <b-field :label="$t('globals.fields.name')" label-position="on-border">
-          <b-input :maxlength="200" v-model="form.name" name="name"
-            :placeholder="$t('globals.fields.name')"></b-input>
-        </b-field>
-
-        <b-field :label="$t('globals.fields.status')" label-position="on-border"
-          :message="$t('subscribers.blocklistedHelp')">
-          <b-select v-model="form.status" name="status" :placeholder="$t('globals.fields.status')"
-            required>
-            <option value="enabled">{{ $t('subscribers.status.enabled') }}</option>
-            <option value="blocklisted">{{ $t('subscribers.status.blocklisted') }}</option>
-          </b-select>
-        </b-field>
+        <div class="columns">
+          <div class="column is-8">
+            <b-field :label="$t('globals.fields.name')" label-position="on-border">
+              <b-input :maxlength="200" v-model="form.name" name="name"
+                :placeholder="$t('globals.fields.name')"></b-input>
+            </b-field>
+          </div>
+          <div class="column is-4">
+            <b-field :label="$t('globals.fields.status')" label-position="on-border"
+              :message="$t('subscribers.blocklistedHelp')">
+              <b-select v-model="form.status" name="status"
+                :placeholder="$t('globals.fields.status')" required expanded>
+                <option value="enabled">{{ $t('subscribers.status.enabled') }}</option>
+                <option value="blocklisted">{{ $t('subscribers.status.blocklisted') }}</option>
+              </b-select>
+            </b-field>
+          </div>
+        </div>
 
         <list-selector
           :label="$t('subscribers.lists')"
@@ -43,12 +48,39 @@
 
         <b-field :label="$t('subscribers.attribs')" label-position="on-border"
           :message="$t('subscribers.attribsHelp') + ' ' + egAttribs">
-          <b-input v-model="form.strAttribs" name="attribs" type="textarea" />
+          <div>
+            <b-input v-model="form.strAttribs" name="attribs" type="textarea" />
+            <a href="https://listmonk.app/docs/concepts"
+              target="_blank" rel="noopener noreferrer" class="is-size-7">
+              {{ $t('globals.buttons.learnMore') }} <b-icon icon="link-variant" size="is-small" />
+            </a>
+          </div>
         </b-field>
-        <a href="https://listmonk.app/docs/concepts"
-          target="_blank" rel="noopener noreferrer" class="is-size-7">
-          {{ $t('globals.buttons.learnMore') }} <b-icon icon="link" size="is-small" />.
-        </a>
+
+        <div class="bounces" v-show="bounces.length > 0">
+          <a href="#" class="is-size-6" disabed="true"
+            @click.prevent="toggleBounces">
+            <b-icon icon="email-bounce"></b-icon>
+            {{ $t('bounces.view') }} ({{ bounces.length }})
+          </a>
+          <a href="#" class="is-size-6 is-pulled-right" disabed="true"
+            @click.prevent="deleteBounces" v-if="isBounceVisible">
+            <b-icon icon="trash-can-outline"></b-icon>
+            {{ $t('globals.buttons.delete') }}
+          </a>
+
+          <div v-if="isBounceVisible">
+            <hr />
+            <ol class="is-size-7">
+              <li v-for="b in bounces" :key="b.id" class="mb-4">
+                  {{ $utils.niceDate(b.createdAt, true) }}
+                  <span class="is-pulled-right">{{ b.source }} <b-icon icon="link-variant" /></span>
+                  <span class="is-clearfix"></span>
+                  <pre>{{ b.meta }}</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
       </section>
       <footer class="modal-card-foot has-text-right">
         <b-button @click="$parent.close()">{{ $t('globals.buttons.close') }}</b-button>
@@ -82,12 +114,36 @@ export default Vue.extend({
       // Binds form input values. This is populated by subscriber props passed
       // from the parent component in mounted().
       form: { lists: [], strAttribs: '{}' },
+      isBounceVisible: false,
+      bounces: [],
 
       egAttribs: '{"job": "developer", "location": "Mars", "has_rocket": true}',
     };
   },
 
   methods: {
+    toggleBounces() {
+      this.isBounceVisible = !this.isBounceVisible;
+    },
+
+    deleteBounces(sub) {
+      this.$utils.confirm(
+        null,
+        () => {
+          this.$api.deleteSubscriberBounces(this.form.id).then(() => {
+            this.getBounces();
+            this.$utils.toast(this.$t('globals.messages.deleted', { name: sub.name }));
+          });
+        },
+      );
+    },
+
+    getBounces() {
+      this.$api.getSubscriberBounces(this.form.id).then((data) => {
+        this.bounces = data;
+      });
+    },
+
     onSubmit() {
       if (this.isEditing) {
         this.updateSubscriber();
@@ -182,6 +238,9 @@ export default Vue.extend({
         strAttribs: JSON.stringify(this.$props.data.attribs, null, 4),
       };
     }
+
+    this.getBounces();
+
 
     this.$nextTick(() => {
       this.$refs.focus.focus();
